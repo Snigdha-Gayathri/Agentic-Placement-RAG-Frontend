@@ -5,16 +5,17 @@ import DeveloperDashboard from "./DeveloperDashboard";
 import PipelineProgress from "./PipelineProgress";
 import ConversationSidebar from "./ConversationSidebar";
 import * as ConversationManager from "./conversationManager";
+import { checkHealth, sendChat, getApiBaseUrl } from "./api";
 
 // ─── Startup Log ─────────────────────────────────────────────────────────────
 console.log(
   `%c[Agentic Placement RAG] App loaded — ${new Date().toISOString()}`,
   "color:#1E90FF;font-weight:bold"
 );
-if (!import.meta.env.VITE_API_BASE_URL) {
+if (!import.meta.env.VITE_API_URL) {
   console.warn(
-    "[Agentic Placement RAG] VITE_API_BASE_URL is not set. " +
-    "Using same-origin API path /api/chat by default."
+    "[Agentic Placement RAG] VITE_API_URL is not set. " +
+    "Using same-origin API path by default."
   );
 }
 
@@ -28,11 +29,7 @@ function generateUUID() {
 }
 
 function getApiBase() {
-  let apiBase = (import.meta.env.VITE_API_BASE_URL || "").trim().replace(/\/$/, "");
-  if (apiBase && !/^https?:\/\//i.test(apiBase)) {
-    apiBase = `https://${apiBase}`;
-  }
-  return apiBase;
+  return getApiBaseUrl();
 }
 
 function getSessionId() {
@@ -744,39 +741,9 @@ function searchKnowledgeBases(query) {
   return results;
 }
 
-// ─── Secure Backend API Call ────────────────────────────────────────────────
-async function callGeminiWithRAG(userMessage, sessionId, requestId) {
-  const apiBase = getApiBase();
-
-  let response;
-  try {
-    response = await fetch(`${apiBase}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: userMessage,
-        session_id: sessionId,
-        request_id: requestId,
-      }),
-    });
-  } catch (networkErr) {
-    console.error("[Placement RAG Agent] Network error calling secure API:", networkErr);
-    throw new Error("⚠️ Network error — could not reach the secure RAG API. Please check your connection and try again.");
-  }
-
-  if (!response.ok) {
-    let detail = "Request could not be processed.";
-    try {
-      const body = await response.json();
-      detail = body?.detail || detail;
-    } catch (_err) {
-      // Keep generic detail to avoid leaking internals.
-    }
-    throw new Error(detail);
-  }
-
-  const data = await response.json();
-  return data;
+// ─── Backend API Call (via centralized api.js) ─────────────────────────────
+async function sendChatToBackend(userMessage, sessionId, requestId) {
+  return sendChat(userMessage, sessionId, requestId);
 }
 
 // ─── Enhanced Markdown Renderer ──────────────────────────────────────────────
@@ -1249,7 +1216,7 @@ export default function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeCompanies] = useState(new Set(COMPANIES));
-  const apiKeyPresent = Boolean(import.meta.env.VITE_GEMINI_API_KEY);
+  const [backendHealthy, setBackendHealthy] = useState(null); // null = checking, true = healthy, false = unhealthy
 
   // New state: dashboard, session, and request tracking
   const [dashboardOpen, setDashboardOpen] = useState(false);
@@ -1265,6 +1232,16 @@ export default function App() {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // ── Backend health check on startup ──
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const result = await checkHealth();
+      if (!cancelled) setBackendHealthy(result.healthy);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -1287,7 +1264,7 @@ export default function App() {
 
     try {
       // Call backend /chat with session_id and request_id
-      const aiResponse = await callGeminiWithRAG(query, sessionId, requestId);
+      const aiResponse = await sendChatToBackend(query, sessionId, requestId);
 
       setMessages((prev) => [
         ...prev.slice(0, -1),
@@ -1454,11 +1431,11 @@ export default function App() {
         </button>
       </div>
 
-      {/* API key missing warning banner */}
-      {!apiKeyPresent && (
+      {/* Backend health status banner */}
+      {backendHealthy === false && (
         <div style={{
-          background: "rgba(255,165,0,0.12)",
-          border: "1px solid rgba(255,165,0,0.4)",
+          background: "rgba(239,68,68,0.12)",
+          border: "1px solid rgba(239,68,68,0.4)",
           borderRadius: "8px",
           padding: "0.7rem 1.2rem",
           margin: "0.75rem 1.5rem 0",
@@ -1470,10 +1447,10 @@ export default function App() {
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
         }}>
-          <span style={{ fontSize: "1.25rem" }}>⚠️</span>
-          <span style={{ color: "#FFA500", fontSize: "0.82rem", fontFamily: "'Space Mono', monospace", lineHeight: 1.5 }}>
-            <strong>API Key Missing</strong> — VITE_GEMINI_API_KEY is not set. AI-powered answers are disabled.
-            Set the environment variable in Render and redeploy, or add it to your local <code>.env</code> file.
+          <span style={{ fontSize: "1.25rem" }}>🔴</span>
+          <span style={{ color: "#EF4444", fontSize: "0.82rem", fontFamily: "'Space Mono', monospace", lineHeight: 1.5 }}>
+            <strong>Backend Unavailable</strong> — Health check failed. The backend server may be starting up or temporarily unavailable.
+            Chat functionality will be available once the backend is reachable.
           </span>
         </div>
       )}

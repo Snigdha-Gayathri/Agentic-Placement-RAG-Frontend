@@ -873,7 +873,7 @@ export default function DeveloperDashboard({ isOpen, onClose, requestId, apiBase
 
           {/* ───── G. Generation Details ───── */}
           <Section title="Generation Details" icon="▤">
-            <DataRow label="Model" value={generation.model || "gemini-2.5-flash"} />
+            <DataRow label="Model" value={generation.model || "Backend LLM"} />
             <DataRow label="Gen Time" value={(generation.generation_latency_ms ?? generation.generation_time) != null ? `${generation.generation_latency_ms ?? generation.generation_time}ms` : null} />
 
             {generation.token_usage && (
