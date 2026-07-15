@@ -1,0 +1,12 @@
+html, body, #root {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: hidden;
+  background: #050A15;
+  display: block !important;
+  text-align: left !important;
+}
