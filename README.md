@@ -155,13 +155,6 @@ Agentic-Placement-RAG-Frontend/
 | 🔍 **Retrieved Chunks** | Ranked chunks with dense/BM25/rerank scores |
 | 🛡️ **Security Events** | Guardrail pass/fail verdicts per request |
 
-```markdown
-![Chat UI](./docs/screenshots/chat-ui.png)
-![Pipeline Timeline](./docs/screenshots/pipeline-timeline.png)
-![Metrics Dashboard](./docs/screenshots/metrics-dashboard.png)
-![Retrieved Chunks](./docs/screenshots/retrieved-chunks.png)
-![Security Events](./docs/screenshots/security-events.png)
-```
 
 ---
 
